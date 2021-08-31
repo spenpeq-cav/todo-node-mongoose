@@ -4,6 +4,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const date = require(__dirname + "/date.js");
+const _ = require("lodash")
 
 const app = express();
 
@@ -13,7 +14,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
 // Adding in mongoose connection
-mongoose.connect("mongodb://localhost:27017/todolistDB", {useNewUrlParser: true})
+mongoose.connect("mongodb://localhost:27017/todolistDB", {useNewUrlParser: true, useUnifiedTopology: true})
 
 const itemsSchema = {
   name: String
@@ -57,7 +58,7 @@ app.get("/", function(req, res) {
 });
 
 app.get("/:listName", function(req, res){
-  const listName = req.params.listName
+  const listName = _.capitalize(req.params.listName)
   
   List.findOne({name: listName}, function(err, foundList){
     if(!err){
@@ -101,14 +102,25 @@ app.post("/", function(req, res){
 
 app.post("/delete", function(req, res){
   const checkedItemId = req.body.checkbox
-  Item.findByIdAndRemove(checkedItemId, function(err){
-    if(err){
-      console.log(err)
-    } else {
-      console.log("Successfully deleted.")
-    }
-  })
-  res.redirect("/")
+  const listName = req.body.listName
+
+  if(listName === 'Today'){
+    Item.findByIdAndRemove(checkedItemId, function(err){
+      if(err){
+        console.log(err)
+      } else {
+        console.log("Successfully deleted.")
+      }
+    })
+    res.redirect("/")
+  } else {
+    List.findOneAndUpdate({name: listName}, {$pull: {items: {_id: checkedItemId}}}, function(err, foundList){
+      if(!err){
+        res.redirect("/" + listName)
+      }
+    })
+  }
+  
 })
 
 app.get("/work", function(req,res){
